@@ -81,7 +81,29 @@ public class IdentityServiceAuthorizationsTest extends PluggableProcessEngineTes
   }
 
   @Test
-  public void testUserCreateAuthorizations() {
+  public void shouldCreateTransientUserWithoutPermission() {
+    // given nobody has CREATE permission on USER resource
+    Authorization basePerms = authorizationService.createNewAuthorization(AUTH_TYPE_GLOBAL);
+    basePerms.setResource(USER);
+    basePerms.setResourceId(ANY);
+    basePerms.addPermission(ALL); // add all then remove 'create'
+    basePerms.removePermission(CREATE);
+    authorizationService.saveAuthorization(basePerms);
+
+    processEngineConfiguration.setAuthorizationEnabled(true);
+    identityService.setAuthenticatedUserId(jonny2);
+
+    // when
+    try {
+      identityService.newUser("jonny1");
+    } catch (AuthorizationException e) {
+      // then
+      fail("no authorization exception expected");
+    }
+  }
+
+  @Test
+  public void testUserInsertionAuthorizations() {
 
     // add base permission which allows nobody to create users:
     Authorization basePerms = authorizationService.createNewAuthorization(AUTH_TYPE_GLOBAL);
@@ -94,19 +116,7 @@ public class IdentityServiceAuthorizationsTest extends PluggableProcessEngineTes
     processEngineConfiguration.setAuthorizationEnabled(true);
     identityService.setAuthenticatedUserId(jonny2);
 
-    try {
-      identityService.newUser("jonny1");
-      fail("exception expected");
-
-    } catch (AuthorizationException e) {
-      assertEquals(1, e.getMissingAuthorizations().size());
-      MissingAuthorization info = e.getMissingAuthorizations().get(0);
-      assertEquals(jonny2, e.getUserId());
-      assertExceptionInfo(CREATE.getName(), USER.resourceName(), null, info);
-    }
-
-    // circumvent auth check to get new transient userobject
-    User newUser = new UserEntity("jonny1");
+    User newUser = identityService.newUser("jonny1");
 
     try {
       identityService.saveUser(newUser);
@@ -192,9 +202,8 @@ public class IdentityServiceAuthorizationsTest extends PluggableProcessEngineTes
   @Test
   public void testUserUpdateAuthorizations() {
 
-    // crate user while still in god-mode:
-    User jonny1 = identityService.newUser("jonny1");
-    identityService.saveUser(jonny1);
+    // insert user while still in god-mode:
+    identityService.saveUser(identityService.newUser("jonny1"));
 
     // create global auth
     Authorization basePerms = authorizationService.createNewAuthorization(AUTH_TYPE_GLOBAL);
@@ -209,13 +218,12 @@ public class IdentityServiceAuthorizationsTest extends PluggableProcessEngineTes
     identityService.setAuthenticatedUserId(jonny2);
 
     // fetch user:
-    jonny1 = identityService.createUserQuery().singleResult();
+    User jonny1 = identityService.createUserQuery().singleResult();
     jonny1.setFirstName("Jonny");
 
     try {
       identityService.saveUser(jonny1);
       fail("exception expected");
-
     } catch (AuthorizationException e) {
       assertEquals(1, e.getMissingAuthorizations().size());
       MissingAuthorization info = e.getMissingAuthorizations().get(0);
@@ -224,8 +232,7 @@ public class IdentityServiceAuthorizationsTest extends PluggableProcessEngineTes
     }
 
     // but I can create a new user:
-    User jonny3 = identityService.newUser("jonny3");
-    identityService.saveUser(jonny3);
+    identityService.saveUser(identityService.newUser("jonny3"));
 
   }
 

@@ -56,7 +56,6 @@ public class DbIdentityServiceProvider extends DbReadOnlyIdentityServiceProvider
   // users ////////////////////////////////////////////////////////
 
   public UserEntity createNewUser(String userId) {
-    checkAuthorization(Permissions.CREATE, Resources.USER, null);
     return new UserEntity(userId);
   }
 
